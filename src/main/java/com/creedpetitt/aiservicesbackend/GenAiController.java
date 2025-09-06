@@ -4,22 +4,36 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.IOException;
+
 @RestController
 public class GenAiController {
+    OpenAIService openAIService;
+    GeminiService  geminiService;
+    ClaudeService  claudeService;
 
-    public GenAiController(ChatService chatService) {
-        this.chatService = chatService;
+    public GenAiController(OpenAIService openAIService, GeminiService geminiService,  ClaudeService claudeService) {
+        this.openAIService = openAIService;
+        this.geminiService = geminiService;
+        this.claudeService = claudeService;
     }
 
-    ChatService chatService;
+    @GetMapping("openai-chat")
+    public String getOpenAIResponse(@RequestParam String prompt) throws IOException {
 
-    @GetMapping("chat")
-    public String getResponse(@RequestParam String prompt) {
-        return chatService.getResponse(prompt);
+        return openAIService.getResponse(prompt);
     }
 
-    @GetMapping("chat-options")
-    public String getResponseOptions(@RequestParam String prompt) {
-        return chatService.getResponseOptions(prompt);
+    @GetMapping("gemini-chat")
+    public String getGeminiResponse(@RequestParam String prompt) throws IOException {
+
+        return geminiService.getResponse(prompt);
     }
+
+    @GetMapping("claude-chat")
+    public String getClaudeResponse(@RequestParam String prompt) throws IOException {
+
+        return claudeService.getResponse(prompt);
+    }
+
 }
