@@ -3,15 +3,21 @@ package com.creedpetitt.aiservicesbackend;
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.stereotype.Service;
 
-@Service
-public class ClaudeService {
+@Service("claudeService")
+public class ClaudeService implements ChatService {
     private final AnthropicChatModel chatModel;
+
     public ClaudeService(AnthropicChatModel chatModel) {
         this.chatModel = chatModel;
     }
 
+    @Override
     public String getResponse(String prompt) {
         return chatModel.call(prompt);
     }
 
+    @Override
+    public String getModel() {
+        return "claude";
+    }
 }
