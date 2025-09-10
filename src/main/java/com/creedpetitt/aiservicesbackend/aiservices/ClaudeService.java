@@ -1,4 +1,4 @@
-package com.creedpetitt.aiservicesbackend;
+package com.creedpetitt.aiservicesbackend.aiservices;
 
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.stereotype.Service;
