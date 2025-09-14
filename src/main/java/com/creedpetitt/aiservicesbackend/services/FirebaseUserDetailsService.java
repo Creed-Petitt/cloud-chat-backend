@@ -24,6 +24,6 @@ public class FirebaseUserDetailsService implements UserDetailsService {
         AppUser appUser = userRepository.findByFirebaseUid(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with UID: " + username));
 
-        return new User(appUser.getEmail(), "", new ArrayList<>());
+        return new User(appUser.getFirebaseUid(), "", new ArrayList<>());
     }
 }
