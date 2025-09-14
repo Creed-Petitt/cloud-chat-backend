@@ -1,6 +1,6 @@
 package com.creedpetitt.aiservicesbackend.services;
 
-import com.creedpetitt.aiservicesbackend.models.User;
+import com.creedpetitt.aiservicesbackend.models.AppUser;
 import com.creedpetitt.aiservicesbackend.repositories.UserRepository;
 import org.springframework.stereotype.Service;
 
@@ -13,10 +13,10 @@ public class UserService {
         this.userRepository = userRepository;
     }
 
-    public User getOrCreateUser(String uid, String email) {
+    public AppUser getOrCreateUser(String uid, String email) {
         return userRepository.findByFirebaseUid(uid)
                 .orElseGet(() -> {
-                    User newUser = new User();
+                    AppUser newUser = new AppUser();
                     newUser.setFirebaseUid(uid);
                     newUser.setEmail(email);
                     return userRepository.save(newUser);
