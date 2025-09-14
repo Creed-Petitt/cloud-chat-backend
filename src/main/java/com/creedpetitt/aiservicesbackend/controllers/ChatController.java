@@ -154,6 +154,16 @@ public class ChatController {
         }
     }
 
+    @DeleteMapping("/conversations/{id}")
+    public ResponseEntity<Void> deleteConversation(@PathVariable Long id, Authentication authentication) {
+        if (authentication == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        AppUser user = getAuthenticatedUser(authentication);
+        conversationService.deleteConversation(id, user);
+        return ResponseEntity.noContent().build();
+    }
+
     // Helper methods
     private AppUser getAuthenticatedUser(Authentication authentication) {
         String uid = authentication.getName();

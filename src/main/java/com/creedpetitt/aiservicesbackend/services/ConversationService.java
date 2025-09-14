@@ -3,6 +3,7 @@ package com.creedpetitt.aiservicesbackend.services;
 import com.creedpetitt.aiservicesbackend.models.AppUser;
 import com.creedpetitt.aiservicesbackend.models.Conversation;
 import com.creedpetitt.aiservicesbackend.repositories.ConversationRepository;
+import com.creedpetitt.aiservicesbackend.repositories.MessageRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,9 +16,11 @@ import java.util.Optional;
 public class ConversationService {
 
     private final ConversationRepository conversationRepository;
+    private final MessageRepository messageRepository;
 
-    public ConversationService(ConversationRepository conversationRepository) {
+    public ConversationService(ConversationRepository conversationRepository, MessageRepository messageRepository) {
         this.conversationRepository = conversationRepository;
+        this.messageRepository = messageRepository;
     }
 
     public Conversation createConversation(AppUser user, String title, String aiModel) {
@@ -53,5 +56,12 @@ public class ConversationService {
     public void updateConversationTimestamp(Conversation conversation) {
         conversation.setUpdatedAt(LocalDateTime.now());
         conversationRepository.save(conversation);
+    }
+
+    public void deleteConversation(Long conversationId, AppUser user) {
+        conversationRepository.findByIdAndUser(conversationId, user).ifPresent(conversation -> {
+            messageRepository.deleteAllByConversation(conversation);
+            conversationRepository.delete(conversation);
+        });
     }
 }
