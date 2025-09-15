@@ -19,7 +19,17 @@ public class UserService {
                     AppUser newUser = new AppUser();
                     newUser.setFirebaseUid(uid);
                     newUser.setEmail(email);
+                    newUser.setMessageCount(0);
                     return userRepository.save(newUser);
                 });
+    }
+
+    public void incrementMessageCount(AppUser user) {
+        user.incrementMessageCount();
+        userRepository.save(user);
+    }
+
+    public int getCurrentMessageCount(AppUser user) {
+        return user.getMessageCount();
     }
 }

@@ -7,12 +7,14 @@ import com.creedpetitt.aiservicesbackend.models.Conversation;
 import com.creedpetitt.aiservicesbackend.models.Message;
 import com.creedpetitt.aiservicesbackend.services.ConversationService;
 import com.creedpetitt.aiservicesbackend.services.MessageService;
+import com.creedpetitt.aiservicesbackend.services.RateLimitingService;
 import com.creedpetitt.aiservicesbackend.services.UserService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,24 +29,23 @@ public class ChatController {
     private final MessageService messageService;
     private final UserService userService;
     private final ChatServiceFactory chatServiceFactory;
+    private final RateLimitingService rateLimitingService;
 
     public ChatController(ConversationService conversationService,
                          MessageService messageService,
                          UserService userService,
-                         ChatServiceFactory chatServiceFactory) {
+                         ChatServiceFactory chatServiceFactory,
+                         RateLimitingService rateLimitingService) {
         this.conversationService = conversationService;
         this.messageService = messageService;
         this.userService = userService;
         this.chatServiceFactory = chatServiceFactory;
+        this.rateLimitingService = rateLimitingService;
     }
 
     @GetMapping("/conversations")
     public ResponseEntity<List<Map<String, Object>>> getConversations(Authentication authentication) {
-        System.out.println("ChatController.getConversations called");
-        System.out.println("Authentication: " + (authentication != null ? authentication.getName() : "NULL"));
-        
         if (authentication == null) {
-            System.out.println("Authentication is null, returning 401");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
@@ -64,9 +65,7 @@ public class ChatController {
 
     @GetMapping("/conversations/{id}")
     public ResponseEntity<Map<String, Object>> getConversation(@PathVariable Long id, Authentication authentication) {
-        System.out.println("-> Entering getConversation for id: " + id);
         if (authentication == null) {
-            System.out.println("<- Exiting getConversation: UNAUTHORIZED");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
@@ -75,7 +74,6 @@ public class ChatController {
             Optional<Conversation> conversationOpt = conversationService.getConversation(id, user);
 
             if (conversationOpt.isEmpty()) {
-                System.out.println("<- Exiting getConversation: NOT FOUND");
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
             }
 
@@ -100,10 +98,30 @@ public class ChatController {
     public ResponseEntity<Map<String, Object>> sendMessage(
             @PathVariable Long id,
             @RequestBody Map<String, String> request,
-            Authentication authentication) {
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
         
-        if (authentication == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        // Rate limiting check
+        if (authentication != null) {
+            // Authenticated user - check database limit
+            AppUser user = getAuthenticatedUser(authentication);
+            if (!rateLimitingService.isUserAllowed(user)) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Rate limit exceeded");
+                errorResponse.put("message", "You have reached the maximum of 10 messages. Please upgrade your account to continue.");
+                errorResponse.put("remainingRequests", 0);
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(errorResponse);
+            }
+        } else {
+            // Anonymous user - check IP-based limit
+            String clientIP = getClientIP(httpRequest);
+            if (!rateLimitingService.isAnonymousAllowed(clientIP)) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Rate limit exceeded");
+                errorResponse.put("message", "You have reached the maximum of 10 messages. Please sign in to continue using the service.");
+                errorResponse.put("remainingRequests", 0);
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(errorResponse);
+            }
         }
 
         try {
@@ -114,41 +132,63 @@ public class ChatController {
                 return ResponseEntity.badRequest().build();
             }
 
-            AppUser user = getAuthenticatedUser(authentication);
-            Conversation conversation;
+            AppUser user = null;
+            Conversation conversation = null;
 
-            if (id == 0) {
+            if (authentication != null) {
+                user = getAuthenticatedUser(authentication);
+                
+                if (id == 0) {
+                    if (aiModel == null || aiModel.trim().isEmpty()) {
+                        return ResponseEntity.badRequest().build();
+                    }
+                    conversation = conversationService.createConversation(user, generateTitle(content), aiModel);
+                } else {
+                    Optional<Conversation> conversationOpt = conversationService.getConversation(id, user);
+                    if (conversationOpt.isEmpty()) {
+                        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+                    }
+                    conversation = conversationOpt.get();
+                }
+            } else {
+
                 if (aiModel == null || aiModel.trim().isEmpty()) {
                     return ResponseEntity.badRequest().build();
                 }
-                conversation = conversationService.createConversation(user, generateTitle(content), aiModel);
-            } else {
-                Optional<Conversation> conversationOpt = conversationService.getConversation(id, user);
-                if (conversationOpt.isEmpty()) {
-                    return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-                }
-                conversation = conversationOpt.get();
             }
 
-            ChatService chatService = chatServiceFactory.getChatService(conversation.getAiModel());
+            ChatService chatService = chatServiceFactory.getChatService(aiModel != null ? aiModel : conversation.getAiModel());
             if (chatService == null) {
                 return ResponseEntity.badRequest().build();
             }
 
-            Message userMessage = messageService.addUserMessage(conversation, user, content);
+            String aiResponse = chatService.getResponse(content);
 
-            List<Message> context = messageService.getConversationMessages(conversation);
-            String contextPrompt = buildContextPrompt(context.subList(0, Math.min(context.size(), 20))); // Last 20 messages
-            String aiResponse = chatService.getResponse(contextPrompt);
+            if (authentication != null) {
 
-            Message aiMessage = messageService.addAssistantMessage(conversation, user, aiResponse);
+                userService.incrementMessageCount(user);
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("conversationId", conversation.getId());
-            response.put("userMessage", messageToMap(userMessage));
-            response.put("aiMessage", messageToMap(aiMessage));
+                Message userMessage = messageService.addUserMessage(conversation, user, content);
+                Message aiMessage = messageService.addAssistantMessage(conversation, user, aiResponse);
+                
+                Map<String, Object> response = new HashMap<>();
+                response.put("conversationId", conversation.getId());
+                response.put("userMessage", messageToMap(userMessage));
+                response.put("aiMessage", messageToMap(aiMessage));
+                response.put("remainingRequests", rateLimitingService.getRemainingRequests(user));
+                return ResponseEntity.ok(response);
+            } else {
 
-            return ResponseEntity.ok(response);
+                String clientIP = getClientIP(httpRequest);
+                rateLimitingService.incrementAnonymousCount(clientIP);
+
+                Map<String, Object> response = new HashMap<>();
+                response.put("conversationId", 0);
+                response.put("userMessage", createTempMessage(content, "USER"));
+                response.put("aiMessage", createTempMessage(aiResponse, "ASSISTANT"));
+                response.put("remainingRequests", rateLimitingService.getRemainingAnonymousRequests(clientIP));
+                return ResponseEntity.ok(response);
+            }
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
@@ -169,6 +209,27 @@ public class ChatController {
         String uid = authentication.getName();
         String email = (String) authentication.getDetails();
         return userService.getOrCreateUser(uid, email != null ? email : uid + "@firebase.user");
+    }
+
+    private String getClientIP(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+            return xForwardedFor.split(",")[0].trim();
+        }
+        String xRealIP = request.getHeader("X-Real-IP");
+        if (xRealIP != null && !xRealIP.isEmpty()) {
+            return xRealIP;
+        }
+        return request.getRemoteAddr();
+    }
+
+    private Map<String, Object> createTempMessage(String content, String type) {
+        Map<String, Object> message = new HashMap<>();
+        message.put("id", 0);
+        message.put("content", content);
+        message.put("type", type);
+        message.put("createdAt", java.time.LocalDateTime.now());
+        return message;
     }
 
     private Map<String, Object> conversationToMap(Conversation conversation) {
