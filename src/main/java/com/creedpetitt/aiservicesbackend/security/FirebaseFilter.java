@@ -38,7 +38,14 @@ public class FirebaseFilter extends OncePerRequestFilter {
             return;
         }
 
-        String token = header.substring(7);
+        String token = header.substring(7).trim();
+        
+        // Check if token is empty or null after extracting
+        if (token.isEmpty()) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+        
         try {
             FirebaseToken decodedToken = firebaseAuth.verifyIdToken(token);
 
