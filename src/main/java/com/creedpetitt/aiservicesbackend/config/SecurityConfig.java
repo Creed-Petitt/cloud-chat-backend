@@ -35,7 +35,9 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/chat/**", "/api/**").authenticated()
+                        .requestMatchers("OPTIONS", "/**").permitAll() // Allow all OPTIONS requests for CORS
+                        .requestMatchers("/api/conversations/*/messages").permitAll() // Allow anonymous chat
+                        .requestMatchers("/api/conversations").authenticated() // Require auth for conversation management
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(firebaseFilter, UsernamePasswordAuthenticationFilter.class);
@@ -48,7 +50,9 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of("http://localhost:5173"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
+        configuration.setAllowedHeaders(Arrays.asList("*")); // Allow all headers
+        configuration.setAllowCredentials(true);
+        configuration.setExposedHeaders(Arrays.asList("Authorization"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
