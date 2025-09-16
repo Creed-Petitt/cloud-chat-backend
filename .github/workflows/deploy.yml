@@ -1,0 +1,39 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Google Auth
+      id: auth
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Configure Docker to use gcloud as a credential helper
+      run: gcloud auth configure-docker us-central1-docker.pkg.dev
+
+    - name: Build and Push Container
+      run: |
+        gcloud builds submit --tag us-central1-docker.pkg.dev/spring-ai-auth/spring-ai-repo/aiservices-backend
+
+    - name: Deploy to Cloud Run
+      run: |
+        gcloud run deploy aiservices-backend \
+          --image=us-central1-docker.pkg.dev/spring-ai-auth/spring-ai-repo/aiservices-backend \
+          --region=us-central1 \
+          --allow-unauthenticated \
+          --set-env-vars=SPRING_PROFILES_ACTIVE=production \
+          --set-secrets=ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,DATABASE_USERNAME=DATABASE_USERNAME:latest,DATABASE_PASSWORD=DATABASE_PASSWORD:latest \
+          --add-cloudsql-instances=spring-ai-auth:us-central1:spring-ai-db
