@@ -34,6 +34,5 @@ build/
 
 ### Security - Environment Variables ###
 src/main/resources/application-local.properties
-src/main/resources/firebase-service-account.json
 .env
 *.env
