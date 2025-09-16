@@ -12,6 +12,9 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
+    - name: Create Firebase Service Account File
+      run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > src/main/resources/firebase-service-account.json
+
     - name: Google Auth
       id: auth
       uses: google-github-actions/auth@v2
@@ -21,12 +24,13 @@ jobs:
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@v2
 
-    - name: Configure Docker to use gcloud as a credential helper
+    - name: Configure Docker
       run: gcloud auth configure-docker us-central1-docker.pkg.dev
 
     - name: Build and Push Container
       run: |
-        gcloud builds submit --tag us-central1-docker.pkg.dev/spring-ai-auth/spring-ai-repo/aiservices-backend
+        docker build -t us-central1-docker.pkg.dev/spring-ai-auth/spring-ai-repo/aiservices-backend .
+        docker push us-central1-docker.pkg.dev/spring-ai-auth/spring-ai-repo/aiservices-backend
 
     - name: Deploy to Cloud Run
       run: |
@@ -34,6 +38,7 @@ jobs:
           --image=us-central1-docker.pkg.dev/spring-ai-auth/spring-ai-repo/aiservices-backend \
           --region=us-central1 \
           --allow-unauthenticated \
+          --service-account=287346424529-compute@developer.gserviceaccount.com \
           --set-env-vars=SPRING_PROFILES_ACTIVE=production \
           --set-secrets=ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,DATABASE_USERNAME=DATABASE_USERNAME:latest,DATABASE_PASSWORD=DATABASE_PASSWORD:latest \
           --add-cloudsql-instances=spring-ai-auth:us-central1:spring-ai-db
