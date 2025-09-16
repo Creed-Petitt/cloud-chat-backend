@@ -36,3 +36,4 @@ build/
 src/main/resources/application-local.properties
 .env
 *.env
+src/main/resources/firebase-service-account.json
