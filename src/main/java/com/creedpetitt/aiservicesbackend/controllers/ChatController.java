@@ -108,7 +108,7 @@ public class ChatController {
             if (!rateLimitingService.isUserAllowed(user)) {
                 Map<String, Object> errorResponse = new HashMap<>();
                 errorResponse.put("error", "Rate limit exceeded");
-                errorResponse.put("message", "You have reached the maximum of 10 messages. Please upgrade your account to continue.");
+                errorResponse.put("message", "You have reached the maximum of 20 messages. Please upgrade your account to continue.");
                 errorResponse.put("remainingRequests", 0);
                 return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(errorResponse);
             }

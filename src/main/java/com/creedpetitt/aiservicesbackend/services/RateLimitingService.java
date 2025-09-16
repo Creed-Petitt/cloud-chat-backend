@@ -9,19 +9,20 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class RateLimitingService {
 
-    private final int MAX_REQUESTS = 10;
+    private final int MAX_ANONYMOUS_REQUESTS = 10;
+    private final int MAX_AUTHENTICATED_REQUESTS = 20;
 
     private final Map<String, Integer> anonymousRequestCounts = new ConcurrentHashMap<>();
 
     public boolean isUserAllowed(AppUser user) {
         if (user == null) return false;
         Integer messageCount = user.getMessageCount();
-        return (messageCount == null ? 0 : messageCount) < MAX_REQUESTS;
+        return (messageCount == null ? 0 : messageCount) < MAX_AUTHENTICATED_REQUESTS;
     }
 
     public boolean isAnonymousAllowed(String ipAddress) {
         int count = anonymousRequestCounts.getOrDefault(ipAddress, 0);
-        return count < MAX_REQUESTS;
+        return count < MAX_ANONYMOUS_REQUESTS;
     }
 
     public void incrementAnonymousCount(String ipAddress) {
@@ -32,11 +33,11 @@ public class RateLimitingService {
     public int getRemainingRequests(AppUser user) {
         if (user == null) return 0;
         Integer messageCount = user.getMessageCount();
-        return Math.max(0, MAX_REQUESTS - (messageCount == null ? 0 : messageCount));
+        return Math.max(0, MAX_AUTHENTICATED_REQUESTS - (messageCount == null ? 0 : messageCount));
     }
 
     public int getRemainingAnonymousRequests(String ipAddress) {
         int count = anonymousRequestCounts.getOrDefault(ipAddress, 0);
-        return Math.max(0, MAX_REQUESTS - count);
+        return Math.max(0, MAX_ANONYMOUS_REQUESTS - count);
     }
 }
