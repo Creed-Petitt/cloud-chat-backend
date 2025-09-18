@@ -20,6 +20,7 @@ public class UserService {
                     newUser.setFirebaseUid(uid);
                     newUser.setEmail(email);
                     newUser.setMessageCount(0);
+                    newUser.setImageCount(0);
                     return userRepository.save(newUser);
                 });
     }
@@ -31,5 +32,14 @@ public class UserService {
 
     public int getCurrentMessageCount(AppUser user) {
         return user.getMessageCount();
+    }
+
+    public void incrementImageCount(AppUser user) {
+        user.incrementImageCount();
+        userRepository.save(user);
+    }
+
+    public int getCurrentImageCount(AppUser user) {
+        return user.getImageCount();
     }
 }

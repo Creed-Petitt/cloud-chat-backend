@@ -20,6 +20,9 @@ public class AppUser {
     @Column(nullable = true)
     private Integer messageCount = 0;
 
+    @Column(nullable = true)
+    private Integer imageCount = 0;
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Conversation> conversations;
 
@@ -60,6 +63,18 @@ public class AppUser {
 
     public void incrementMessageCount() {
         this.messageCount = (this.messageCount == null ? 0 : this.messageCount) + 1;
+    }
+
+    public Integer getImageCount() {
+        return imageCount;
+    }
+
+    public void setImageCount(Integer imageCount) {
+        this.imageCount = imageCount;
+    }
+
+    public void incrementImageCount() {
+        this.imageCount = (this.imageCount == null ? 0 : this.imageCount) + 1;
     }
 
     public List<Conversation> getConversations() {

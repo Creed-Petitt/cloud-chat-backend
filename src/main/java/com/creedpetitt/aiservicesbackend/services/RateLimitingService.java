@@ -11,6 +11,7 @@ public class RateLimitingService {
 
     private final int MAX_ANONYMOUS_REQUESTS = 10;
     private final int MAX_AUTHENTICATED_REQUESTS = 20;
+    private final int MAX_IMAGES_PER_USER = 3;
 
     private final Map<String, Integer> anonymousRequestCounts = new ConcurrentHashMap<>();
 
@@ -39,5 +40,17 @@ public class RateLimitingService {
     public int getRemainingAnonymousRequests(String ipAddress) {
         int count = anonymousRequestCounts.getOrDefault(ipAddress, 0);
         return Math.max(0, MAX_ANONYMOUS_REQUESTS - count);
+    }
+
+    public boolean isUserImageAllowed(AppUser user) {
+        if (user == null) return false;
+        Integer imageCount = user.getImageCount();
+        return (imageCount == null ? 0 : imageCount) < MAX_IMAGES_PER_USER;
+    }
+
+    public int getRemainingImages(AppUser user) {
+        if (user == null) return 0;
+        Integer imageCount = user.getImageCount();
+        return Math.max(0, MAX_IMAGES_PER_USER - (imageCount == null ? 0 : imageCount));
     }
 }
