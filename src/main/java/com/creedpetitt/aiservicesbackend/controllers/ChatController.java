@@ -10,9 +10,12 @@ import com.creedpetitt.aiservicesbackend.services.MessageService;
 import com.creedpetitt.aiservicesbackend.services.RateLimitingService;
 import com.creedpetitt.aiservicesbackend.services.UserService;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+import reactor.core.publisher.Flux;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
@@ -192,6 +195,58 @@ public class ChatController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
+    }
+
+    @PostMapping(value = "/conversations/{id}/messages/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> streamMessage(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> request,
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+
+        // Rate limiting check
+        if (authentication != null) {
+            AppUser user = getAuthenticatedUser(authentication);
+            if (!rateLimitingService.isUserAllowed(user)) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Rate limit exceeded for user.");
+            }
+            userService.incrementMessageCount(user);
+        } else {
+            String clientIP = getClientIP(httpRequest);
+            if (!rateLimitingService.isAnonymousAllowed(clientIP)) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Rate limit exceeded for anonymous user.");
+            }
+            rateLimitingService.incrementAnonymousCount(clientIP);
+        }
+
+        String content = request.get("content");
+        if (content == null || content.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Content cannot be empty.");
+        }
+
+        String aiModel = request.get("aiModel");
+        Conversation conversation = null;
+
+        if (authentication != null && id != 0) {
+            AppUser user = getAuthenticatedUser(authentication);
+            conversation = conversationService.getConversation(id, user)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversation not found."));
+        }
+
+        if (aiModel == null || aiModel.trim().isEmpty()) {
+            if (conversation != null) {
+                aiModel = conversation.getAiModel();
+            } else {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "aiModel must be provided for new conversations.");
+            }
+        }
+
+        ChatService chatService = chatServiceFactory.getChatService(aiModel);
+        if (chatService == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid aiModel specified.");
+        }
+
+        return chatService.getResponseStream(content);
     }
 
     @DeleteMapping("/conversations/{id}")
