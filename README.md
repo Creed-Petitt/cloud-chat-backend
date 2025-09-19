@@ -1,23 +1,21 @@
-# AI Services Backend
+# Cloud-Native LLM Gateway (Backend)
 
-This project is a cloud-native Spring Boot backend designed to provide a unified API for interacting with multiple large language models (LLMs). It acts as a gateway to services like OpenAI, Anthropic's Claude, and Google's Gemini, while also managing user authentication, conversation history, and rate limiting.
-
-The application is built for seamless deployment to Google Cloud Run, leveraging a CI/CD pipeline with GitHub Actions for automated builds and deployments.
+This repository contains the cloud-native Spring Boot backend for AetheriusAI, a multimodal chat application. The service functions as a secure and scalable gateway, providing a unified RESTful API to orchestrate interactions between clients and multiple LLM providers (OpenAI, Anthropic Claude, Google Gemini). It is configured for serverless deployment on Google Cloud Run and features a complete CI/CD pipeline for automated, zero-downtime deployments.
 
 ## Key Features
 
-- **Multi-Provider AI Integration**: Dynamically switch between OpenAI, Claude, and Gemini models through a single, unified API endpoint.
-- **Persistent Conversation History**: Saves user conversations and messages in a PostgreSQL database, allowing for stateful interactions.
-- **Secure User Authentication**: Integrates with Firebase for robust, token-based user authentication and authorization using Spring Security.
+- **LLM Provider Abstraction**: Dynamically switch between OpenAI, Claude, and Gemini models through a single, unified API endpoint.
+- **Stateful Conversation Persistence**: Saves user conversations and messages in a PostgreSQL database, allowing for stateful interactions.
+- **JWT-Based Security with Firebase**: Integrates with Firebase for robust, token-based user authentication and authorization using Spring Security.
 - **Rate Limiting**: Protects the API from abuse with configurable rate limits:
   - **Authenticated users**: 20 messages and 3 images per account
   - **Anonymous users**: 10 messages per IP address (no image generation)
-- **Cloud-Native Architecture**: Designed for serverless deployment on Google Cloud Run, using Cloud SQL for the database and Artifact Registry for container storage.
+- **Serverless Cloud-Native Architecture**: Designed for serverless deployment on Google Cloud Run, using Cloud SQL for the database and Artifact Registry for container storage.
 - **Automated CI/CD**: A complete GitHub Actions workflow automates testing, building, and deploying the application on every push to the `master` branch.
 
 ## Architecture Overview
 
-The application follows a standard layered architecture common in Spring Boot applications:
+The application follows a decoupled, layered architecture to ensure separation of concerns and maintainability.
 
 1.  **Controllers**: The `ChatController` and `ImageController` expose the public REST API endpoints. They handle incoming HTTP requests, validate them, and pass them to the service layer.
 2.  **Security**: A `FirebaseFilter` intercepts incoming requests to validate the Firebase JWT token present in the `Authorization` header. `SecurityConfig` defines the security rules for the application.
@@ -161,7 +159,7 @@ The initial deployment involves setting up the Google Cloud environment and depl
     - Injects secrets (API keys, database credentials) from Google Secret Manager.
     - Sets environment variables (e.g., `SPRING_PROFILES_ACTIVE=production`).
 
-### Automated Deployment with GitHub Actions
+### Zero-Downtime CI/CD with GitHub Actions
 
 The `.github/workflows/deploy.yml` file defines the CI/CD pipeline, which automates the manual steps above. On every push to the `main` branch, the workflow does the following:
 
@@ -222,14 +220,24 @@ export DATABASE_PASSWORD=your_db_password
 mvn spring-boot:run
 ```
 
-### Frontend Application
-This backend pairs with the **[Aetherius AI Frontend](https://github.com/Creed-Petitt/spring-ai-frontend)** - a React application that demonstrates the API's capabilities through a modern chat interface.
+## API Consumer: AetheriusAI Frontend
+
+This backend API was designed to be consumed by any client. A first-party reference implementation has been developed using React, which serves as the public-facing web application.
+
+This client application demonstrates the backend's full capabilities, including:
+- Secure consumption of JWT-protected endpoints.
+- Real-time, streaming responses from the `/messages/stream` endpoint.
+- Limited image generation with OpenAI's flagship DALL-E-3 model.
+- Stateful management of conversation history.
+- Graceful handling of API errors and rate-limiting responses.
+
+The frontend repository can be found [here](https://github.com/Creed-Petitt/spring-ai-frontend).
 
 ## Technology Stack
 
 - **Backend**: Spring Boot 3
 - **Language**: Java 21
-- **AI**: Spring AI (OpenAI, Anthropic, Vertex AI Gemini)
+- **AI**: Spring AI (OpenAI, Anthropic, Vertex AI)
 - **Database**: PostgreSQL with Spring Data JPA
 - **Authentication/Persistence**: Spring Security & Firebase Admin SDK for a multi-client provider
 - **Cloud**: Google Cloud Run, Google Cloud SQL, Google Artifact Registry
