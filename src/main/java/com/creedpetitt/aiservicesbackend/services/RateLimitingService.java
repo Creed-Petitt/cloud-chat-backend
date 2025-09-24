@@ -9,9 +9,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class RateLimitingService {
 
-    private final int MAX_ANONYMOUS_REQUESTS = 10;
-    private final int MAX_AUTHENTICATED_REQUESTS = 20;
-    private final int MAX_IMAGES_PER_USER = 3;
+    private final int MAX_ANONYMOUS_REQUESTS = 20;
+    private final int MAX_AUTHENTICATED_REQUESTS = 50;
+    private final int MAX_IMAGES_PER_USER = 10;
 
     private final Map<String, Integer> anonymousRequestCounts = new ConcurrentHashMap<>();
 
