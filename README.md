@@ -1,6 +1,6 @@
 # Cloud-Native LLM Gateway (Backend)
 
-This repository contains the cloud-native Spring Boot backend for AetheriusAI, a multimodal chat application. The service functions as a secure and scalable gateway, providing a unified RESTful API to orchestrate interactions between clients and multiple LLM providers (OpenAI, Anthropic Claude, Google Gemini). It is configured for serverless deployment on Google Cloud Run and features a complete CI/CD pipeline for automated, zero-downtime deployments.
+This repository contains the cloud-native Spring Boot backend for CloudChat, a multimodal chat application. The service functions as a secure and scalable gateway, providing a unified RESTful API to orchestrate interactions between clients and multiple LLM providers (OpenAI, Anthropic Claude, Google Gemini). It is configured for serverless deployment on Google Cloud Run and features a complete CI/CD pipeline for automated, zero-downtime deployments.
 
 ## Key Features
 
@@ -205,7 +205,7 @@ This setup ensures that the latest version of the application is always deployed
 ### Local Development
 ```bash
 # Clone and build
-git clone https://github.com/Creed-Petitt/spring-ai-backend
+git clone https://github.com/Creed-Petitt/cloud-chat-backend
 cd AiServicesBackend
 mvn clean install
 
@@ -220,7 +220,7 @@ export DATABASE_PASSWORD=your_db_password
 mvn spring-boot:run
 ```
 
-## API Consumer: AetheriusAI Frontend
+## API Consumer: CloudChat Frontend
 
 This backend API was designed to be consumed by any client. A first-party reference implementation has been developed using React, which serves as the public-facing web application.
 
@@ -231,7 +231,7 @@ This client application demonstrates the backend's full capabilities, including:
 - Stateful management of conversation history.
 - Graceful handling of API errors and rate-limiting responses.
 
-The frontend repository can be found [here](https://github.com/Creed-Petitt/spring-ai-frontend).
+The frontend repository can be found [here](https://github.com/Creed-Petitt/cloud-chat-frontend).
 
 ## Technology Stack
 
