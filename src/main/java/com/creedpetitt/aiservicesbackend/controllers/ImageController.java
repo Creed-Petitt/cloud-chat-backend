@@ -1,5 +1,6 @@
 package com.creedpetitt.aiservicesbackend.controllers;
 
+import com.creedpetitt.aiservicesbackend.aiservices.ImagenService;
 import com.creedpetitt.aiservicesbackend.aiservices.OpenAIService;
 import com.creedpetitt.aiservicesbackend.models.AppUser;
 import com.creedpetitt.aiservicesbackend.services.RateLimitingService;
@@ -17,13 +18,16 @@ import java.util.Map;
 public class ImageController {
 
     private final OpenAIService openAIService;
+    private final ImagenService imagenService;
     private final RateLimitingService rateLimitingService;
     private final UserService userService;
 
     public ImageController(OpenAIService openAIService,
+                          ImagenService imagenService,
                           RateLimitingService rateLimitingService,
                           UserService userService) {
         this.openAIService = openAIService;
+        this.imagenService = imagenService;
         this.rateLimitingService = rateLimitingService;
         this.userService = userService;
     }
@@ -55,13 +59,22 @@ public class ImageController {
                 return ResponseEntity.badRequest().body(errorResponse);
             }
 
-            String imageUrl = openAIService.generateImage(prompt);
+            // Get model type (default to "imagen" for now, could be "dalle")
+            String model = request.getOrDefault("model", "imagen");
+
+            String imageUrl;
+            if ("dalle".equalsIgnoreCase(model)) {
+                imageUrl = openAIService.generateImage(prompt);
+            } else {
+                imageUrl = imagenService.generateImage(prompt);
+            }
 
             userService.incrementImageCount(user);
 
             Map<String, Object> response = new HashMap<>();
             response.put("imageUrl", imageUrl);
             response.put("prompt", prompt);
+            response.put("model", model);
             response.put("remainingImages", rateLimitingService.getRemainingImages(user));
             response.put("generatedAt", java.time.LocalDateTime.now());
 
@@ -76,12 +89,21 @@ public class ImageController {
     }
 
     @GetMapping("/generate-test")
-    public ResponseEntity<String> generateImageTest(@RequestParam String prompt) {
+    public ResponseEntity<String> generateImageTest(
+            @RequestParam String prompt,
+            @RequestParam(defaultValue = "imagen") String model) {
         try {
             if (prompt == null || prompt.trim().isEmpty()) {
                 return ResponseEntity.badRequest().body("Prompt is required");
             }
-            String imageUrl = openAIService.generateImage(prompt);
+
+            String imageUrl;
+            if ("dalle".equalsIgnoreCase(model)) {
+                imageUrl = openAIService.generateImage(prompt);
+            } else {
+                imageUrl = imagenService.generateImage(prompt);
+            }
+
             return ResponseEntity.status(HttpStatus.FOUND)
                     .header("Location", imageUrl)
                     .body("Redirecting to image: " + imageUrl);
