@@ -258,19 +258,52 @@ public class ChatController {
             return emitter;
         }
 
+        // Create conversation and save user message if authenticated
+        final Conversation finalConversation;
+        final AppUser finalUser;
+
+        if (authentication != null) {
+            finalUser = getAuthenticatedUser(authentication);
+
+            if (id == 0) {
+                // Create new conversation
+                String title = generateTitle(content);
+                finalConversation = conversationService.createConversation(finalUser, title, aiModel);
+            } else {
+                finalConversation = conversation;
+            }
+
+            // Save user message
+            messageService.addUserMessage(finalConversation, finalUser, content);
+        } else {
+            finalConversation = null;
+            finalUser = null;
+        }
+
+        final Long conversationId = (finalConversation != null) ? finalConversation.getId() : null;
+
         // Subscribe to the Flux stream and send chunks via SseEmitter
         Flux<String> responseStream = chatService.getResponseStream(content);
+        final StringBuilder fullResponse = new StringBuilder();
 
         responseStream.subscribe(
             chunk -> {
                 try {
+                    fullResponse.append(chunk);
                     emitter.send(SseEmitter.event().data(chunk));
                 } catch (Exception e) {
                     emitter.completeWithError(e);
                 }
             },
-            error -> emitter.completeWithError(error),
-            () -> emitter.complete()
+                emitter::completeWithError,
+            () -> {
+                // Save assistant message when streaming completes
+                if (conversationId != null && finalUser != null) {
+                    conversationService.getConversation(conversationId, finalUser)
+                            .ifPresent(conv -> messageService.addAssistantMessage(conv, finalUser, fullResponse.toString()));
+                }
+                emitter.complete();
+            }
         );
 
         return emitter;
