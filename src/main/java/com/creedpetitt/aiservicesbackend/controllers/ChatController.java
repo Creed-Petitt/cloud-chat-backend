@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -198,30 +199,35 @@ public class ChatController {
     }
 
     @PostMapping(value = "/conversations/{id}/messages/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> streamMessage(
+    public SseEmitter streamMessage(
             @PathVariable Long id,
             @RequestBody Map<String, String> request,
             Authentication authentication,
             HttpServletRequest httpRequest) {
 
+        SseEmitter emitter = new SseEmitter(300000L); // 5 minute timeout
+
         // Rate limiting check
         if (authentication != null) {
             AppUser user = getAuthenticatedUser(authentication);
             if (!rateLimitingService.isUserAllowed(user)) {
-                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Rate limit exceeded for user.");
+                emitter.completeWithError(new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Rate limit exceeded for user."));
+                return emitter;
             }
             userService.incrementMessageCount(user);
         } else {
             String clientIP = getClientIP(httpRequest);
             if (!rateLimitingService.isAnonymousAllowed(clientIP)) {
-                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Rate limit exceeded for anonymous user.");
+                emitter.completeWithError(new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Rate limit exceeded for anonymous user."));
+                return emitter;
             }
             rateLimitingService.incrementAnonymousCount(clientIP);
         }
 
         String content = request.get("content");
         if (content == null || content.trim().isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Content cannot be empty.");
+            emitter.completeWithError(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Content cannot be empty."));
+            return emitter;
         }
 
         String aiModel = request.get("aiModel");
@@ -229,24 +235,45 @@ public class ChatController {
 
         if (authentication != null && id != 0) {
             AppUser user = getAuthenticatedUser(authentication);
-            conversation = conversationService.getConversation(id, user)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversation not found."));
+            Optional<Conversation> conversationOpt = conversationService.getConversation(id, user);
+            if (conversationOpt.isEmpty()) {
+                emitter.completeWithError(new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversation not found."));
+                return emitter;
+            }
+            conversation = conversationOpt.get();
         }
 
         if (aiModel == null || aiModel.trim().isEmpty()) {
             if (conversation != null) {
                 aiModel = conversation.getAiModel();
             } else {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "aiModel must be provided for new conversations.");
+                emitter.completeWithError(new ResponseStatusException(HttpStatus.BAD_REQUEST, "aiModel must be provided for new conversations."));
+                return emitter;
             }
         }
 
         ChatService chatService = chatServiceFactory.getChatService(aiModel);
         if (chatService == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid aiModel specified.");
+            emitter.completeWithError(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid aiModel specified."));
+            return emitter;
         }
 
-        return chatService.getResponseStream(content);
+        // Subscribe to the Flux stream and send chunks via SseEmitter
+        Flux<String> responseStream = chatService.getResponseStream(content);
+
+        responseStream.subscribe(
+            chunk -> {
+                try {
+                    emitter.send(SseEmitter.event().data(chunk));
+                } catch (Exception e) {
+                    emitter.completeWithError(e);
+                }
+            },
+            error -> emitter.completeWithError(error),
+            () -> emitter.complete()
+        );
+
+        return emitter;
     }
 
     @DeleteMapping("/conversations/{id}")
