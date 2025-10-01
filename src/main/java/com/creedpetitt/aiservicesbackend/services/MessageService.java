@@ -21,6 +21,13 @@ public class MessageService {
         this.conversationService = conversationService;
     }
 
+    public Message saveMessage(Message message) {
+        if (message == null) {
+            throw new IllegalArgumentException("Message cannot be null");
+        }
+        return messageRepository.save(message);
+    }
+
     public Message addUserMessage(Conversation conversation, AppUser user, String content) {
         if (conversation == null || user == null || content == null || content.trim().isEmpty()) {
             throw new IllegalArgumentException("Conversation, user and content cannot be null or empty");
@@ -54,4 +61,14 @@ public class MessageService {
         }
         return messageRepository.findByConversationOrderByCreatedAtAsc(conversation);
     }
+
+    @Transactional(readOnly = true)
+    public List<Message> getUserImageMessages(AppUser user) {
+        if (user == null) {
+            throw new IllegalArgumentException("User cannot be null");
+        }
+        return messageRepository.findAllByUserAndMessageType(user, Message.MessageType.IMAGE);
+    }
+
+
 }

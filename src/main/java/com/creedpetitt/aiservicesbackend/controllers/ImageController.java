@@ -3,6 +3,10 @@ package com.creedpetitt.aiservicesbackend.controllers;
 import com.creedpetitt.aiservicesbackend.aiservices.ImagenService;
 import com.creedpetitt.aiservicesbackend.aiservices.OpenAIService;
 import com.creedpetitt.aiservicesbackend.models.AppUser;
+import com.creedpetitt.aiservicesbackend.models.Conversation;
+import com.creedpetitt.aiservicesbackend.models.Message;
+import com.creedpetitt.aiservicesbackend.services.ConversationService;
+import com.creedpetitt.aiservicesbackend.services.MessageService;
 import com.creedpetitt.aiservicesbackend.services.RateLimitingService;
 import com.creedpetitt.aiservicesbackend.services.UserService;
 import org.springframework.http.HttpStatus;
@@ -11,6 +15,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -21,15 +26,21 @@ public class ImageController {
     private final ImagenService imagenService;
     private final RateLimitingService rateLimitingService;
     private final UserService userService;
+    private final MessageService messageService;
+    private final ConversationService conversationService;
 
     public ImageController(OpenAIService openAIService,
                           ImagenService imagenService,
                           RateLimitingService rateLimitingService,
-                          UserService userService) {
+                          UserService userService,
+                          MessageService messageService,
+                          ConversationService conversationService) {
         this.openAIService = openAIService;
         this.imagenService = imagenService;
         this.rateLimitingService = rateLimitingService;
         this.userService = userService;
+        this.messageService = messageService;
+        this.conversationService = conversationService;
     }
 
     @PostMapping("/generate")
@@ -59,8 +70,8 @@ public class ImageController {
                 return ResponseEntity.badRequest().body(errorResponse);
             }
 
-            // Get model type (default to "imagen" for now, could be "dalle")
             String model = request.getOrDefault("model", "imagen");
+            String conversationIdStr = request.get("conversationId");
 
             String imageUrl;
             if ("dalle".equalsIgnoreCase(model)) {
@@ -68,6 +79,18 @@ public class ImageController {
             } else {
                 imageUrl = imagenService.generateImage(prompt);
             }
+
+            Conversation conversation;
+            if (conversationIdStr != null && !conversationIdStr.isEmpty()) {
+                long conversationId = Long.parseLong(conversationIdStr);
+                conversation = conversationService.getConversationById(conversationId).orElseThrow(() -> new RuntimeException("Conversation not found"));
+            } else {
+                conversation = new Conversation(user, prompt, model);
+                conversation = conversationService.saveConversation(conversation);
+            }
+
+            Message message = new Message(conversation, user, prompt, Message.MessageType.IMAGE, imageUrl);
+            messageService.saveMessage(message);
 
             userService.incrementImageCount(user);
 
@@ -77,6 +100,7 @@ public class ImageController {
             response.put("model", model);
             response.put("remainingImages", rateLimitingService.getRemainingImages(user));
             response.put("generatedAt", java.time.LocalDateTime.now());
+            response.put("conversationId", conversation.getId());
 
             return ResponseEntity.ok(response);
 
@@ -111,6 +135,34 @@ public class ImageController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error generating image: " + e.getMessage());
         }
+    }
+
+    @GetMapping("/my-images")
+    public ResponseEntity<List<Map<String, Object>>> getMyImages(Authentication authentication) {
+        if (authentication == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        try {
+            AppUser user = getAuthenticatedUser(authentication);
+            List<Message> images = messageService.getUserImageMessages(user);
+            List<Map<String, Object>> response = images.stream()
+                    .map(this::messageToMap)
+                    .collect(java.util.stream.Collectors.toList());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    private Map<String, Object> messageToMap(Message message) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", message.getId());
+        map.put("content", message.getContent());
+        map.put("messageType", message.getMessageType().toString()); // Renamed from "type" to be more specific
+        map.put("imageUrl", message.getImageUrl());
+        map.put("createdAt", message.getCreatedAt());
+        return map;
     }
 
     // Helper method

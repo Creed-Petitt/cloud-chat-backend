@@ -37,6 +37,18 @@ public class ConversationService {
         return conversationRepository.save(conversation);
     }
 
+    public Conversation saveConversation(Conversation conversation) {
+        return conversationRepository.save(conversation);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<Conversation> getConversationById(Long conversationId) {
+        if (conversationId == null) {
+            return Optional.empty();
+        }
+        return conversationRepository.findById(conversationId);
+    }
+
     @Transactional(readOnly = true)
     public Optional<Conversation> getConversation(Long conversationId, AppUser user) {
         if (conversationId == null || user == null) {

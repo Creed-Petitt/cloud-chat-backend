@@ -26,6 +26,9 @@ public class Message {
     @Column(name = "message_type", nullable = false, length = 20)
     private MessageType messageType;
 
+    @Column(name = "image_url")
+    private String imageUrl;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -42,6 +45,14 @@ public class Message {
         this.user = user;
         this.content = content;
         this.messageType = messageType;
+    }
+
+    public Message(Conversation conversation, AppUser user, String content, MessageType messageType, String imageUrl) {
+        this.conversation = conversation;
+        this.user = user;
+        this.content = content;
+        this.messageType = messageType;
+        this.imageUrl = imageUrl;
     }
 
     public Long getId() {
@@ -84,6 +95,14 @@ public class Message {
         this.messageType = messageType;
     }
 
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
@@ -92,16 +111,10 @@ public class Message {
         this.createdAt = createdAt;
     }
 
-    public boolean isUserMessage() {
-        return messageType == MessageType.USER;
-    }
-
-    public boolean isAssistantMessage() {
-        return messageType == MessageType.ASSISTANT;
-    }
 
     public enum MessageType {
         USER,
-        ASSISTANT
+        ASSISTANT,
+        IMAGE
     }
 }

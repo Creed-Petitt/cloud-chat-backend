@@ -361,23 +361,12 @@ public class ChatController {
         Map<String, Object> map = new HashMap<>();
         map.put("id", message.getId());
         map.put("content", message.getContent());
-        map.put("type", message.getMessageType().toString());
+        map.put("messageType", message.getMessageType().toString());
+        map.put("imageUrl", message.getImageUrl()); // Add this line
         map.put("createdAt", message.getCreatedAt());
         return map;
     }
 
-    private String buildContextPrompt(List<Message> messages) {
-        if (messages.isEmpty()) {
-            return "";
-        }
-
-        StringBuilder prompt = new StringBuilder();
-        for (Message msg : messages) {
-            String role = msg.isUserMessage() ? "User" : "Assistant";
-            prompt.append(role).append(": ").append(msg.getContent()).append("\n");
-        }
-        return prompt.toString();
-    }
 
     private String generateTitle(String content) {
         String title = content.trim();
