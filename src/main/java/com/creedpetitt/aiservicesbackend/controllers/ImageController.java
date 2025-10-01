@@ -83,14 +83,20 @@ public class ImageController {
             Conversation conversation;
             if (conversationIdStr != null && !conversationIdStr.isEmpty()) {
                 long conversationId = Long.parseLong(conversationIdStr);
-                conversation = conversationService.getConversationById(conversationId).orElseThrow(() -> new RuntimeException("Conversation not found"));
+                conversation = conversationService.getConversationById(conversationId)
+                        .orElseThrow(() -> new RuntimeException("Conversation not found"));
             } else {
-                conversation = new Conversation(user, prompt, model);
+                conversation = new Conversation(user, "Image Generation", model);
                 conversation = conversationService.saveConversation(conversation);
             }
 
-            Message message = new Message(conversation, user, prompt, Message.MessageType.IMAGE, imageUrl);
-            messageService.saveMessage(message);
+            // Save the user's prompt as a message
+            Message userMessage = new Message(conversation, user, prompt, Message.MessageType.USER);
+            messageService.saveMessage(userMessage);
+
+            // Save the generated image as a message
+            Message imageMessage = new Message(conversation, user, "Generated Image", Message.MessageType.ASSISTANT, imageUrl);
+            messageService.saveMessage(imageMessage);
 
             userService.incrementImageCount(user);
 

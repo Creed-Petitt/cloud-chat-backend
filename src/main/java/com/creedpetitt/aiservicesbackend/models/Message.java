@@ -114,7 +114,6 @@ public class Message {
 
     public enum MessageType {
         USER,
-        ASSISTANT,
-        IMAGE
+        ASSISTANT
     }
 }
