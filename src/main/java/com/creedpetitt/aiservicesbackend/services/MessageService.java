@@ -41,6 +41,19 @@ public class MessageService {
         return savedMessage;
     }
 
+    public Message addUserMessage(Conversation conversation, AppUser user, String content, String imageUrl) {
+        if (conversation == null || user == null || content == null || content.trim().isEmpty()) {
+            throw new IllegalArgumentException("Conversation, user and content cannot be null or empty");
+        }
+
+        Message message = new Message(conversation, user, content.trim(), Message.MessageType.USER, imageUrl);
+        Message savedMessage = messageRepository.save(message);
+
+        conversationService.updateConversationTimestamp(conversation);
+        
+        return savedMessage;
+    }
+
     public Message addAssistantMessage(Conversation conversation, AppUser user, String content) {
         if (conversation == null || user == null || content == null || content.trim().isEmpty()) {
             throw new IllegalArgumentException("Conversation, user and content cannot be null or empty");
