@@ -98,106 +98,6 @@ public class ChatController {
         }
     }
 
-    @PostMapping("/conversations/{id}/messages")
-    public ResponseEntity<Map<String, Object>> sendMessage(
-            @PathVariable Long id,
-            @RequestBody Map<String, String> request,
-            Authentication authentication,
-            HttpServletRequest httpRequest) {
-        
-        // Rate limiting check
-        if (authentication != null) {
-            // Authenticated user - check database limit
-            AppUser user = getAuthenticatedUser(authentication);
-            if (!rateLimitingService.isUserAllowed(user)) {
-                Map<String, Object> errorResponse = new HashMap<>();
-                errorResponse.put("error", "Rate limit exceeded");
-                errorResponse.put("message", "You have reached the maximum of 20 messages. Please upgrade your account to continue.");
-                errorResponse.put("remainingRequests", 0);
-                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(errorResponse);
-            }
-        } else {
-            // Anonymous user - check IP-based limit
-            String clientIP = getClientIP(httpRequest);
-            if (!rateLimitingService.isAnonymousAllowed(clientIP)) {
-                Map<String, Object> errorResponse = new HashMap<>();
-                errorResponse.put("error", "Rate limit exceeded");
-                errorResponse.put("message", "You have reached the maximum of 10 messages. Please sign in to continue using the service.");
-                errorResponse.put("remainingRequests", 0);
-                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(errorResponse);
-            }
-        }
-
-        try {
-            String content = request.get("content");
-            String aiModel = request.get("aiModel");
-            
-            if (content == null || content.trim().isEmpty()) {
-                return ResponseEntity.badRequest().build();
-            }
-
-            AppUser user = null;
-            Conversation conversation = null;
-
-            if (authentication != null) {
-                user = getAuthenticatedUser(authentication);
-                
-                if (id == 0) {
-                    if (aiModel == null || aiModel.trim().isEmpty()) {
-                        return ResponseEntity.badRequest().build();
-                    }
-                    conversation = conversationService.createConversation(user, generateTitle(content), aiModel);
-                } else {
-                    Optional<Conversation> conversationOpt = conversationService.getConversation(id, user);
-                    if (conversationOpt.isEmpty()) {
-                        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-                    }
-                    conversation = conversationOpt.get();
-                }
-            } else {
-
-                if (aiModel == null || aiModel.trim().isEmpty()) {
-                    return ResponseEntity.badRequest().build();
-                }
-            }
-
-            ChatService chatService = chatServiceFactory.getChatService(aiModel != null ? aiModel : conversation.getAiModel());
-            if (chatService == null) {
-                return ResponseEntity.badRequest().build();
-            }
-
-            String aiResponse = chatService.getResponse(content);
-
-            if (authentication != null) {
-
-                userService.incrementMessageCount(user);
-
-                Message userMessage = messageService.addUserMessage(conversation, user, content);
-                Message aiMessage = messageService.addAssistantMessage(conversation, user, aiResponse);
-                
-                Map<String, Object> response = new HashMap<>();
-                response.put("conversationId", conversation.getId());
-                response.put("userMessage", messageToMap(userMessage));
-                response.put("aiMessage", messageToMap(aiMessage));
-                response.put("remainingRequests", rateLimitingService.getRemainingRequests(user));
-                return ResponseEntity.ok(response);
-            } else {
-
-                String clientIP = getClientIP(httpRequest);
-                rateLimitingService.incrementAnonymousCount(clientIP);
-
-                Map<String, Object> response = new HashMap<>();
-                response.put("conversationId", 0);
-                response.put("userMessage", createTempMessage(content, "USER"));
-                response.put("aiMessage", createTempMessage(aiResponse, "ASSISTANT"));
-                response.put("remainingRequests", rateLimitingService.getRemainingAnonymousRequests(clientIP));
-                return ResponseEntity.ok(response);
-            }
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
     @PostMapping(value = "/conversations/{id}/messages/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamMessage(
             @PathVariable Long id,
@@ -230,6 +130,7 @@ public class ChatController {
             return emitter;
         }
 
+        String imageUrl = request.get("imageUrl");
         String aiModel = request.get("aiModel");
         Conversation conversation = null;
 
@@ -274,7 +175,11 @@ public class ChatController {
             }
 
             // Save user message
-            messageService.addUserMessage(finalConversation, finalUser, content);
+            if (imageUrl != null && !imageUrl.trim().isEmpty()) {
+                messageService.addUserMessage(finalConversation, finalUser, content, imageUrl);
+            } else {
+                messageService.addUserMessage(finalConversation, finalUser, content);
+            }
         } else {
             finalConversation = null;
             finalUser = null;
@@ -283,7 +188,12 @@ public class ChatController {
         final Long conversationId = (finalConversation != null) ? finalConversation.getId() : null;
 
         // Subscribe to the Flux stream and send chunks via SseEmitter
-        Flux<String> responseStream = chatService.getResponseStream(content);
+        Flux<String> responseStream;
+        if (imageUrl != null && !imageUrl.trim().isEmpty()) {
+            responseStream = chatService.getResponseStream(content, imageUrl);
+        } else {
+            responseStream = chatService.getResponseStream(content);
+        }
         final StringBuilder fullResponse = new StringBuilder();
 
         responseStream.subscribe(
