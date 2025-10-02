@@ -20,12 +20,14 @@ public class ClaudeService implements ChatService {
 
     @Override
     public String getResponse(String prompt) {
-        return chatModel.call(prompt);
+        String systemPrompt = "Always format your responses in proper markdown. Use code fences (```) with language tags for code blocks.";
+        return chatModel.call(systemPrompt + "\n\n" + prompt);
     }
 
     @Override
     public Flux<String> getResponseStream(String prompt) {
-        return chatModel.stream(new Prompt(prompt))
+        String systemPrompt = "Always format your responses in proper markdown. Use code fences (```) with language tags for code blocks.";
+        return chatModel.stream(new Prompt(systemPrompt + "\n\n" + prompt))
                 .mapNotNull(chatResponse ->
                         Optional.ofNullable(chatResponse)
                                 .map(ChatResponse::getResult)
