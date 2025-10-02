@@ -1,6 +1,8 @@
 package com.creedpetitt.aiservicesbackend.config;
 
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.StorageOptions;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import com.google.firebase.auth.FirebaseAuth;
@@ -33,5 +35,18 @@ public class FirebaseConfig {
     @Bean
     public FirebaseAuth firebaseAuth(FirebaseApp firebaseApp) {
         return FirebaseAuth.getInstance(firebaseApp);
+    }
+
+    @Bean
+    public Storage storage() throws IOException {
+        ClassPathResource resource = new ClassPathResource("firebase-service-account.json");
+        InputStream serviceAccount = resource.getInputStream();
+        
+        GoogleCredentials credentials = GoogleCredentials.fromStream(serviceAccount);
+        
+        return StorageOptions.newBuilder()
+                .setCredentials(credentials)
+                .build()
+                .getService();
     }
 }
