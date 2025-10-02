@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,22 +47,34 @@ public class ImageController {
     @PostMapping("/generate")
     public ResponseEntity<Map<String, Object>> generateImage(
             @RequestBody Map<String, String> request,
-            Authentication authentication) {
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
 
-        if (authentication == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-
-        try {
-            AppUser user = getAuthenticatedUser(authentication);
-
+        // Rate limiting check
+        AppUser user = null;
+        if (authentication != null) {
+            // Authenticated user - check database limit
+            user = getAuthenticatedUser(authentication);
             if (!rateLimitingService.isUserImageAllowed(user)) {
                 Map<String, Object> errorResponse = new HashMap<>();
                 errorResponse.put("error", "Image rate limit exceeded");
-                errorResponse.put("message", "You have reached the maximum of 3 images. Please upgrade your account to continue.");
+                errorResponse.put("message", "You have reached the maximum of 5 images. Please upgrade your account to continue.");
                 errorResponse.put("remainingImages", 0);
                 return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(errorResponse);
             }
+        } else {
+            // Anonymous user - check IP-based limit
+            String clientIP = getClientIP(httpRequest);
+            if (!rateLimitingService.isAnonymousImageAllowed(clientIP)) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Image rate limit exceeded");
+                errorResponse.put("message", "You have reached the maximum of 3 images. Please sign in to continue using the service.");
+                errorResponse.put("remainingImages", 0);
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(errorResponse);
+            }
+        }
+
+        try {
 
             String prompt = request.get("prompt");
             if (prompt == null || prompt.trim().isEmpty()) {
@@ -80,35 +93,52 @@ public class ImageController {
                 imageUrl = imagenService.generateImage(prompt);
             }
 
-            Conversation conversation;
-            if (conversationIdStr != null && !conversationIdStr.isEmpty()) {
-                long conversationId = Long.parseLong(conversationIdStr);
-                conversation = conversationService.getConversationById(conversationId)
-                        .orElseThrow(() -> new RuntimeException("Conversation not found"));
+            // Save conversation and messages only for authenticated users
+            if (authentication != null) {
+                Conversation conversation;
+                if (conversationIdStr != null && !conversationIdStr.isEmpty()) {
+                    long conversationId = Long.parseLong(conversationIdStr);
+                    conversation = conversationService.getConversationById(conversationId)
+                            .orElseThrow(() -> new RuntimeException("Conversation not found"));
+                } else {
+                    conversation = new Conversation(user, "Image Generation", model);
+                    conversation = conversationService.saveConversation(conversation);
+                }
+
+                // Save the user's prompt as a message
+                Message userMessage = new Message(conversation, user, prompt, Message.MessageType.USER);
+                messageService.saveMessage(userMessage);
+
+                // Save the generated image as a message
+                Message imageMessage = new Message(conversation, user, "Generated Image", Message.MessageType.ASSISTANT, imageUrl);
+                messageService.saveMessage(imageMessage);
+
+                userService.incrementImageCount(user);
+
+                Map<String, Object> response = new HashMap<>();
+                response.put("imageUrl", imageUrl);
+                response.put("prompt", prompt);
+                response.put("model", model);
+                response.put("remainingImages", rateLimitingService.getRemainingImages(user));
+                response.put("generatedAt", java.time.LocalDateTime.now());
+                response.put("conversationId", conversation.getId());
+
+                return ResponseEntity.ok(response);
             } else {
-                conversation = new Conversation(user, "Image Generation", model);
-                conversation = conversationService.saveConversation(conversation);
+                // Anonymous user - just return the image without saving
+                String clientIP = getClientIP(httpRequest);
+                rateLimitingService.incrementAnonymousImageCount(clientIP);
+
+                Map<String, Object> response = new HashMap<>();
+                response.put("imageUrl", imageUrl);
+                response.put("prompt", prompt);
+                response.put("model", model);
+                response.put("remainingImages", rateLimitingService.getRemainingAnonymousImages(clientIP));
+                response.put("generatedAt", java.time.LocalDateTime.now());
+                response.put("conversationId", 0);
+
+                return ResponseEntity.ok(response);
             }
-
-            // Save the user's prompt as a message
-            Message userMessage = new Message(conversation, user, prompt, Message.MessageType.USER);
-            messageService.saveMessage(userMessage);
-
-            // Save the generated image as a message
-            Message imageMessage = new Message(conversation, user, "Generated Image", Message.MessageType.ASSISTANT, imageUrl);
-            messageService.saveMessage(imageMessage);
-
-            userService.incrementImageCount(user);
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("imageUrl", imageUrl);
-            response.put("prompt", prompt);
-            response.put("model", model);
-            response.put("remainingImages", rateLimitingService.getRemainingImages(user));
-            response.put("generatedAt", java.time.LocalDateTime.now());
-            response.put("conversationId", conversation.getId());
-
-            return ResponseEntity.ok(response);
 
         } catch (Exception e) {
             Map<String, Object> errorResponse = new HashMap<>();
@@ -171,10 +201,22 @@ public class ImageController {
         return map;
     }
 
-    // Helper method
+    // Helper methods
     private AppUser getAuthenticatedUser(Authentication authentication) {
         String uid = authentication.getName();
         String email = (String) authentication.getDetails();
         return userService.getOrCreateUser(uid, email != null ? email : uid + "@firebase.user");
+    }
+
+    private String getClientIP(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+            return xForwardedFor.split(",")[0].trim();
+        }
+        String xRealIP = request.getHeader("X-Real-IP");
+        if (xRealIP != null && !xRealIP.isEmpty()) {
+            return xRealIP;
+        }
+        return request.getRemoteAddr();
     }
 }
