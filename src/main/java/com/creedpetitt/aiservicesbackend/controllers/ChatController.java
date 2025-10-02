@@ -292,17 +292,32 @@ public class ChatController {
                     fullResponse.append(chunk);
                     emitter.send(SseEmitter.event().data(chunk));
                 } catch (Exception e) {
-                    emitter.completeWithError(e);
+                    // Client disconnected or emitter already completed - ignore
+                    try {
+                        emitter.completeWithError(e);
+                    } catch (IllegalStateException ignored) {
+                        // Emitter already completed, ignore
+                    }
                 }
             },
-                emitter::completeWithError,
+            error -> {
+                try {
+                    emitter.completeWithError(error);
+                } catch (IllegalStateException ignored) {
+                    // Emitter already completed, ignore
+                }
+            },
             () -> {
                 // Save assistant message when streaming completes
-                if (conversationId != null && finalUser != null) {
+                if (conversationId != null && finalUser != null && !fullResponse.isEmpty()) {
                     conversationService.getConversation(conversationId, finalUser)
                             .ifPresent(conv -> messageService.addAssistantMessage(conv, finalUser, fullResponse.toString()));
                 }
-                emitter.complete();
+                try {
+                    emitter.complete();
+                } catch (IllegalStateException ignored) {
+                    // Emitter already completed, ignore
+                }
             }
         );
 
