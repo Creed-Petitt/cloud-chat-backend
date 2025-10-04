@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -29,18 +30,15 @@ public class UploadController {
             String fileUrl = imageUploadService.uploadUserImage(file);
 
             Map<String, String> response = new HashMap<>();
-            response.put("imageUrl", fileUrl);  // Keep key as imageUrl for backward compatibility
+            response.put("imageUrl", fileUrl);
             return ResponseEntity.ok(response);
 
         } catch (IllegalArgumentException e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            return ResponseEntity.badRequest().body(error);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
 
         } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", "Failed to upload image: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                "Failed to upload image: " + e.getMessage(), e);
         }
     }
 }

@@ -2,6 +2,10 @@ package com.creedpetitt.aiservicesbackend.controllers;
 
 import com.creedpetitt.aiservicesbackend.aiservices.ChatService;
 import com.creedpetitt.aiservicesbackend.aiservices.ChatServiceFactory;
+import com.creedpetitt.aiservicesbackend.dto.ConversationDetailDto;
+import com.creedpetitt.aiservicesbackend.dto.ConversationDto;
+import com.creedpetitt.aiservicesbackend.dto.MessageDto;
+import com.creedpetitt.aiservicesbackend.dto.StreamMessageRequestDto;
 import com.creedpetitt.aiservicesbackend.models.AppUser;
 import com.creedpetitt.aiservicesbackend.models.Conversation;
 import com.creedpetitt.aiservicesbackend.models.Message;
@@ -9,6 +13,8 @@ import com.creedpetitt.aiservicesbackend.services.ConversationService;
 import com.creedpetitt.aiservicesbackend.services.MessageService;
 import com.creedpetitt.aiservicesbackend.services.RateLimitingService;
 import com.creedpetitt.aiservicesbackend.services.UserService;
+import com.creedpetitt.aiservicesbackend.util.RequestUtils;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -18,20 +24,17 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 
-import jakarta.servlet.http.HttpServletRequest;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+// All exceptions are handled globally via GlobalExceptionHandler
 @RestController
 @RequestMapping("/api")
-public class ChatController {
+public class ChatController extends BaseController {
 
     private final ConversationService conversationService;
     private final MessageService messageService;
-    private final UserService userService;
     private final ChatServiceFactory chatServiceFactory;
     private final RateLimitingService rateLimitingService;
 
@@ -40,68 +43,49 @@ public class ChatController {
                          UserService userService,
                          ChatServiceFactory chatServiceFactory,
                          RateLimitingService rateLimitingService) {
+        super(userService);
         this.conversationService = conversationService;
         this.messageService = messageService;
-        this.userService = userService;
         this.chatServiceFactory = chatServiceFactory;
         this.rateLimitingService = rateLimitingService;
     }
 
     @GetMapping("/conversations")
-    public ResponseEntity<List<Map<String, Object>>> getConversations(Authentication authentication) {
-        if (authentication == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
+    public ResponseEntity<List<ConversationDto>> getConversations(Authentication authentication) {
+        AppUser user = requireAuthenticatedUser(authentication);
+        List<Conversation> conversations = conversationService.getUserConversations(user);
 
-        try {
-            AppUser user = getAuthenticatedUser(authentication);
-            List<Conversation> conversations = conversationService.getUserConversations(user);
-            
-            List<Map<String, Object>> response = conversations.stream()
-                    .map(this::conversationToMap)
-                    .collect(Collectors.toList());
+        List<ConversationDto> response = conversations.stream()
+                .map(ConversationDto::fromEntity)
+                .collect(Collectors.toList());
 
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/conversations/{id}")
-    public ResponseEntity<Map<String, Object>> getConversation(@PathVariable Long id, Authentication authentication) {
-        if (authentication == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
+    public ResponseEntity<ConversationDetailDto> getConversation(@PathVariable Long id, Authentication authentication) {
+        AppUser user = requireAuthenticatedUser(authentication);
+        Conversation conversation = conversationService.getConversation(id, user)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversation not found"));
 
-        try {
-            AppUser user = getAuthenticatedUser(authentication);
-            Optional<Conversation> conversationOpt = conversationService.getConversation(id, user);
+        List<Message> messages = messageService.getConversationMessages(conversation);
 
-            if (conversationOpt.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-            }
+        List<MessageDto> messageList = messages.stream()
+                .map(MessageDto::fromEntity)
+                .collect(Collectors.toList());
 
-            Conversation conversation = conversationOpt.get();
-            List<Message> messages = messageService.getConversationMessages(conversation);
+        ConversationDetailDto response = new ConversationDetailDto(
+                ConversationDto.fromEntity(conversation),
+                messageList
+        );
 
-            List<Map<String, Object>> messageList = messages.stream()
-                    .map(this::messageToMap)
-                    .collect(Collectors.toList());
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("conversation", conversationToMap(conversation));
-            response.put("messages", messageList);
-
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping(value = "/conversations/{id}/messages/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamMessage(
             @PathVariable Long id,
-            @RequestBody Map<String, String> request,
+            @RequestBody StreamMessageRequestDto request,
             Authentication authentication,
             HttpServletRequest httpRequest) {
 
@@ -116,7 +100,7 @@ public class ChatController {
             }
             userService.incrementMessageCount(user);
         } else {
-            String clientIP = getClientIP(httpRequest);
+            String clientIP = RequestUtils.getClientIP(httpRequest);
             if (!rateLimitingService.isAnonymousAllowed(clientIP)) {
                 emitter.completeWithError(new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Rate limit exceeded for anonymous user."));
                 return emitter;
@@ -124,14 +108,14 @@ public class ChatController {
             rateLimitingService.incrementAnonymousCount(clientIP);
         }
 
-        String content = request.get("content");
+        String content = request.content();
         if (content == null || content.trim().isEmpty()) {
             emitter.completeWithError(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Content cannot be empty."));
             return emitter;
         }
 
-        String imageUrl = request.get("imageUrl");
-        String aiModel = request.get("aiModel");
+        String imageUrl = request.imageUrl();
+        String aiModel = request.aiModel();
         Conversation conversation = null;
 
         if (authentication != null && id != 0) {
@@ -236,63 +220,12 @@ public class ChatController {
 
     @DeleteMapping("/conversations/{id}")
     public ResponseEntity<Void> deleteConversation(@PathVariable Long id, Authentication authentication) {
-        if (authentication == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        AppUser user = getAuthenticatedUser(authentication);
+        AppUser user = requireAuthenticatedUser(authentication);
         conversationService.deleteConversation(id, user);
         return ResponseEntity.noContent().build();
     }
 
     // Helper methods
-    private AppUser getAuthenticatedUser(Authentication authentication) {
-        String uid = authentication.getName();
-        String email = (String) authentication.getDetails();
-        return userService.getOrCreateUser(uid, email != null ? email : uid + "@firebase.user");
-    }
-
-    private String getClientIP(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-        String xRealIP = request.getHeader("X-Real-IP");
-        if (xRealIP != null && !xRealIP.isEmpty()) {
-            return xRealIP;
-        }
-        return request.getRemoteAddr();
-    }
-
-    private Map<String, Object> createTempMessage(String content, String type) {
-        Map<String, Object> message = new HashMap<>();
-        message.put("id", 0);
-        message.put("content", content);
-        message.put("type", type);
-        message.put("createdAt", java.time.LocalDateTime.now());
-        return message;
-    }
-
-    private Map<String, Object> conversationToMap(Conversation conversation) {
-        Map<String, Object> map = new HashMap<>();
-        map.put("id", conversation.getId());
-        map.put("title", conversation.getTitle());
-        map.put("aiModel", conversation.getAiModel());
-        map.put("createdAt", conversation.getCreatedAt());
-        map.put("updatedAt", conversation.getUpdatedAt());
-        return map;
-    }
-
-    private Map<String, Object> messageToMap(Message message) {
-        Map<String, Object> map = new HashMap<>();
-        map.put("id", message.getId());
-        map.put("content", message.getContent());
-        map.put("messageType", message.getMessageType().toString());
-        map.put("imageUrl", message.getImageUrl()); // Add this line
-        map.put("createdAt", message.getCreatedAt());
-        return map;
-    }
-
-
     private String generateTitle(String content) {
         String title = content.trim();
         if (title.length() > 50) {
