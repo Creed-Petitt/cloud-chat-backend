@@ -83,5 +83,16 @@ public class MessageService {
         return messageRepository.findAllImageMessagesByUser(user);
     }
 
+    @Transactional
+    public void recordImageGeneration(Conversation conversation, AppUser user, String prompt, String imageUrl) {
+        Message userMessage = new Message(conversation, user, prompt, Message.MessageType.USER);
+        messageRepository.save(userMessage);
+
+        Message imageMessage = new Message(conversation, user, "Generated Image", Message.MessageType.ASSISTANT, imageUrl);
+        messageRepository.save(imageMessage);
+
+        conversationService.updateConversationTimestamp(conversation);
+    }
+
 
 }

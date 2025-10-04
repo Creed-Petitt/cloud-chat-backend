@@ -105,13 +105,7 @@ public class ImageController {
                     conversation = conversationService.saveConversation(conversation);
                 }
 
-                // Save the user's prompt as a message
-                Message userMessage = new Message(conversation, user, prompt, Message.MessageType.USER);
-                messageService.saveMessage(userMessage);
-
-                // Save the generated image as a message
-                Message imageMessage = new Message(conversation, user, "Generated Image", Message.MessageType.ASSISTANT, imageUrl);
-                messageService.saveMessage(imageMessage);
+                messageService.recordImageGeneration(conversation, user, prompt, imageUrl);
 
                 userService.incrementImageCount(user);
 
