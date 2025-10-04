@@ -8,7 +8,7 @@ import org.springframework.ai.image.ImageResponse;
 import org.springframework.stereotype.Service;
 
 @Service("openAIService")
-public class OpenAIService extends ChatService {
+public class OpenAIService extends ChatService implements ImageService {
     private final OpenAiChatModel chatModel;
     private final OpenAiImageModel imageModel;
 
@@ -27,6 +27,12 @@ public class OpenAIService extends ChatService {
         return "openai";
     }
 
+    @Override
+    public String getImageModel() {
+        return "dalle";
+    }
+
+    @Override
     public String generateImage(String prompt) {
         ImageResponse response = imageModel.call(new ImagePrompt(prompt));
         return response.getResult().getOutput().getUrl();

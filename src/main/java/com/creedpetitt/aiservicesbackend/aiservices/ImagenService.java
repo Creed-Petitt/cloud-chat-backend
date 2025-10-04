@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Service
-public class ImagenService {
+public class ImagenService implements ImageService {
 
     @Value("${spring.cloud.gcp.project-id}")
     private String projectId;
@@ -20,6 +20,12 @@ public class ImagenService {
     @Value("${spring.cloud.gcp.storage.bucket}")
     private String storageBucket;
 
+    @Override
+    public String getImageModel() {
+        return "imagen";
+    }
+
+    @Override
     public String generateImage(String prompt) throws IOException {
         String endpoint = String.format("%s-aiplatform.googleapis.com:443", location);
         PredictionServiceSettings settings = PredictionServiceSettings.newBuilder()
