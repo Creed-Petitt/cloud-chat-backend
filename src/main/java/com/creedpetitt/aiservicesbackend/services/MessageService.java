@@ -54,16 +54,17 @@ public class MessageService {
         return savedMessage;
     }
 
-    public Message addAssistantMessage(Conversation conversation, AppUser user, String content) {
+    public Message addAssistantMessage(Conversation conversation, AppUser user, String content, String aiModel) {
         if (conversation == null || user == null || content == null || content.trim().isEmpty()) {
             throw new IllegalArgumentException("Conversation, user and content cannot be null or empty");
         }
 
         Message message = new Message(conversation, user, content.trim(), Message.MessageType.ASSISTANT);
+        message.setAiModel(aiModel);
         Message savedMessage = messageRepository.save(message);
 
         conversationService.updateConversationTimestamp(conversation);
-        
+
         return savedMessage;
     }
 
@@ -84,11 +85,12 @@ public class MessageService {
     }
 
     @Transactional
-    public void recordImageGeneration(Conversation conversation, AppUser user, String prompt, String imageUrl) {
+    public void recordImageGeneration(Conversation conversation, AppUser user, String prompt, String imageUrl, String aiModel) {
         Message userMessage = new Message(conversation, user, prompt, Message.MessageType.USER);
         messageRepository.save(userMessage);
 
         Message imageMessage = new Message(conversation, user, "Generated Image", Message.MessageType.ASSISTANT, imageUrl);
+        imageMessage.setAiModel(aiModel);
         messageRepository.save(imageMessage);
 
         conversationService.updateConversationTimestamp(conversation);

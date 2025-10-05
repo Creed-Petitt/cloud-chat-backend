@@ -94,7 +94,7 @@ public class ImageController extends BaseController {
                     conversation = conversationService.createConversation(user, "Image Generation", model);
                 }
 
-                messageService.recordImageGeneration(conversation, user, prompt, imageUrl);
+                messageService.recordImageGeneration(conversation, user, prompt, imageUrl, model);
 
                 userService.incrementImageCount(user);
 

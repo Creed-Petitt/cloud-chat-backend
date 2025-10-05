@@ -10,6 +10,7 @@ public record MessageDto(
     String content,
     MessageType messageType,
     String imageUrl,
+    String aiModel,
     LocalDateTime createdAt
 ) {
     public static MessageDto fromEntity(Message message) {
@@ -18,6 +19,7 @@ public record MessageDto(
             message.getContent(),
             message.getMessageType(),
             message.getImageUrl(),
+            message.getAiModel(),
             message.getCreatedAt()
         );
     }

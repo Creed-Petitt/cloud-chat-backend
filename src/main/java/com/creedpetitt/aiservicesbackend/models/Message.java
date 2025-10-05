@@ -29,6 +29,9 @@ public class Message {
     @Column(name = "image_url")
     private String imageUrl;
 
+    @Column(name = "ai_model", length = 50)
+    private String aiModel;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -101,6 +104,14 @@ public class Message {
 
     public void setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
+    }
+
+    public String getAiModel() {
+        return aiModel;
+    }
+
+    public void setAiModel(String aiModel) {
+        this.aiModel = aiModel;
     }
 
     public LocalDateTime getCreatedAt() {

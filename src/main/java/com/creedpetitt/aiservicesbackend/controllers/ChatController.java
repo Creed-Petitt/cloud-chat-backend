@@ -170,6 +170,7 @@ public class ChatController extends BaseController {
         }
 
         final Long conversationId = (finalConversation != null) ? finalConversation.getId() : null;
+        final String finalAiModel = aiModel;
 
         // Subscribe to the Flux stream and send chunks via SseEmitter
         Flux<String> responseStream;
@@ -205,7 +206,7 @@ public class ChatController extends BaseController {
                 // Save assistant message when streaming completes
                 if (conversationId != null && finalUser != null && !fullResponse.isEmpty()) {
                     conversationService.getConversation(conversationId, finalUser)
-                            .ifPresent(conv -> messageService.addAssistantMessage(conv, finalUser, fullResponse.toString()));
+                            .ifPresent(conv -> messageService.addAssistantMessage(conv, finalUser, fullResponse.toString(), finalAiModel));
                 }
                 try {
                     emitter.complete();
