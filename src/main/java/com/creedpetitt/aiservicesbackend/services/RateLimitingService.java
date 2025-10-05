@@ -3,19 +3,11 @@ package com.creedpetitt.aiservicesbackend.services;
 import com.creedpetitt.aiservicesbackend.models.AppUser;
 import org.springframework.stereotype.Service;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 @Service
 public class RateLimitingService {
 
-    private final int MAX_ANONYMOUS_REQUESTS = 20;
     private final int MAX_AUTHENTICATED_REQUESTS = 50;
     private final int MAX_IMAGES_PER_USER = 5;
-    private final int MAX_ANONYMOUS_IMAGES = 3;
-
-    private final Map<String, Integer> anonymousRequestCounts = new ConcurrentHashMap<>();
-    private final Map<String, Integer> anonymousImageCounts = new ConcurrentHashMap<>();
 
     public boolean isUserAllowed(AppUser user) {
         if (user == null) return false;
@@ -23,25 +15,10 @@ public class RateLimitingService {
         return (messageCount == null ? 0 : messageCount) < MAX_AUTHENTICATED_REQUESTS;
     }
 
-    public boolean isAnonymousAllowed(String ipAddress) {
-        int count = anonymousRequestCounts.getOrDefault(ipAddress, 0);
-        return count < MAX_ANONYMOUS_REQUESTS;
-    }
-
-    public void incrementAnonymousCount(String ipAddress) {
-        int count = anonymousRequestCounts.getOrDefault(ipAddress, 0);
-        anonymousRequestCounts.put(ipAddress, count + 1);
-    }
-
     public int getRemainingRequests(AppUser user) {
         if (user == null) return 0;
         Integer messageCount = user.getMessageCount();
         return Math.max(0, MAX_AUTHENTICATED_REQUESTS - (messageCount == null ? 0 : messageCount));
-    }
-
-    public int getRemainingAnonymousRequests(String ipAddress) {
-        int count = anonymousRequestCounts.getOrDefault(ipAddress, 0);
-        return Math.max(0, MAX_ANONYMOUS_REQUESTS - count);
     }
 
     public boolean isUserImageAllowed(AppUser user) {
@@ -54,20 +31,5 @@ public class RateLimitingService {
         if (user == null) return 0;
         Integer imageCount = user.getImageCount();
         return Math.max(0, MAX_IMAGES_PER_USER - (imageCount == null ? 0 : imageCount));
-    }
-
-    public boolean isAnonymousImageAllowed(String ipAddress) {
-        int count = anonymousImageCounts.getOrDefault(ipAddress, 0);
-        return count < MAX_ANONYMOUS_IMAGES;
-    }
-
-    public void incrementAnonymousImageCount(String ipAddress) {
-        int count = anonymousImageCounts.getOrDefault(ipAddress, 0);
-        anonymousImageCounts.put(ipAddress, count + 1);
-    }
-
-    public int getRemainingAnonymousImages(String ipAddress) {
-        int count = anonymousImageCounts.getOrDefault(ipAddress, 0);
-        return Math.max(0, MAX_ANONYMOUS_IMAGES - count);
     }
 }

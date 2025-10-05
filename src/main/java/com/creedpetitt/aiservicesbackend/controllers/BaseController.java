@@ -17,7 +17,7 @@ public abstract class BaseController {
     protected AppUser getAuthenticatedUser(Authentication authentication) {
         String uid = authentication.getName();
         String email = (String) authentication.getDetails();
-        return userService.getOrCreateUser(uid, email != null ? email : uid + "@firebase.user");
+        return userService.getOrCreateUser(uid, email != null ? email : uid + "@firebase.user", "unknown");
     }
 
     protected AppUser requireAuthenticatedUser(Authentication authentication) {
