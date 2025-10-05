@@ -49,7 +49,11 @@ public class FirebaseFilter extends OncePerRequestFilter {
         try {
             FirebaseToken decodedToken = firebaseAuth.verifyIdToken(token);
 
-            userService.getOrCreateUser(decodedToken.getUid(), decodedToken.getEmail());
+            String provider = decodedToken.getClaims().containsKey("sign_in_provider")
+                ? (String) decodedToken.getClaims().get("sign_in_provider")
+                : "unknown";
+
+            userService.getOrCreateUser(decodedToken.getUid(), decodedToken.getEmail(), provider);
 
             UserDetails userDetails = userDetailsService.loadUserByUsername(decodedToken.getUid());
 

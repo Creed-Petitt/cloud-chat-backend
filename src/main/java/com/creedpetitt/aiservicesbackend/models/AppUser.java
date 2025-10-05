@@ -28,6 +28,9 @@ public class AppUser implements UserDetails {
     @Column
     private Integer imageCount = 0;
 
+    @Column(name = "is_guest")
+    private boolean isGuest = false;
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Conversation> conversations;
 
@@ -80,6 +83,14 @@ public class AppUser implements UserDetails {
 
     public void incrementImageCount() {
         this.imageCount = (this.imageCount == null ? 0 : this.imageCount) + 1;
+    }
+
+    public boolean isGuest() {
+        return isGuest;
+    }
+
+    public void setGuest(boolean guest) {
+        isGuest = guest;
     }
 
     public List<Conversation> getConversations() {

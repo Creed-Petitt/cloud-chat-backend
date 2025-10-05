@@ -13,15 +13,22 @@ public class UserService {
         this.userRepository = userRepository;
     }
 
-    public AppUser getOrCreateUser(String uid, String email) {
+    public AppUser getOrCreateUser(String uid, String email, String provider) {
         return userRepository.findByFirebaseUid(uid)
                 .orElseGet(() -> {
-                    AppUser newUser = new AppUser();
-                    newUser.setFirebaseUid(uid);
-                    newUser.setEmail(email);
-                    newUser.setMessageCount(0);
-                    newUser.setImageCount(0);
-                    return userRepository.save(newUser);
+                    try {
+                        AppUser newUser = new AppUser();
+                        newUser.setFirebaseUid(uid);
+                        newUser.setEmail(email != null ? email : uid + "@anonymous.user");
+                        newUser.setGuest("anonymous".equals(provider));
+                        newUser.setMessageCount(0);
+                        newUser.setImageCount(0);
+                        return userRepository.save(newUser);
+                    } catch (Exception e) {
+                        // Race condition: another thread created user, fetch it
+                        return userRepository.findByFirebaseUid(uid)
+                                .orElseThrow(() -> new RuntimeException("Failed to create or find user", e));
+                    }
                 });
     }
 
