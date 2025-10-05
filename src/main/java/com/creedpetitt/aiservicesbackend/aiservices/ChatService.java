@@ -1,6 +1,7 @@
 package com.creedpetitt.aiservicesbackend.aiservices;
 
 import org.springframework.ai.chat.messages.AbstractMessage;
+import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -18,7 +19,17 @@ import java.util.Optional;
 
 public abstract class ChatService {
 
-    protected static final String SYSTEM_PROMPT = "Always format your responses in proper markdown. Use code fences (```) with language tags for code blocks.";
+    protected static final String SYSTEM_PROMPT =
+        "Format responses in clean markdown:\n" +
+        "- Use ## for section headers\n" +
+        "- Separate sections/paragraphs with double line breaks\n" +
+        "- Indent nested bullets with 4 spaces\n" +
+        "- Use code fences (```) with language tags for code\n\n" +
+        "Example:\n" +
+        "## Header\n\n" +
+        "Text here.\n\n" +
+        "* Point\n" +
+        "    * Sub-point";
 
     protected abstract ChatModel getChatModel();
 
@@ -29,7 +40,9 @@ public abstract class ChatService {
     }
 
     public Flux<String> getResponseStream(String prompt) {
-        return getChatModel().stream(new Prompt(SYSTEM_PROMPT + "\n\n" + prompt))
+        SystemMessage systemMessage = new SystemMessage(SYSTEM_PROMPT);
+        UserMessage userMessage = new UserMessage(prompt);
+        return getChatModel().stream(new Prompt(List.of(systemMessage, userMessage)))
                 .mapNotNull(chatResponse ->
                         Optional.ofNullable(chatResponse)
                                 .map(ChatResponse::getResult)
@@ -45,8 +58,9 @@ public abstract class ChatService {
                     .text(prompt)
                     .media(List.of(new Media(mimeType, new UrlResource(imageUrl))))
                     .build();
+            SystemMessage systemMessage = new SystemMessage(SYSTEM_PROMPT);
 
-            return getChatModel().stream(new Prompt(userMessage))
+            return getChatModel().stream(new Prompt(List.of(systemMessage, userMessage)))
                     .mapNotNull(chatResponse ->
                             Optional.ofNullable(chatResponse)
                                     .map(ChatResponse::getResult)
