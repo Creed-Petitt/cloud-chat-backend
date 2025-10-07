@@ -12,6 +12,11 @@ import java.util.Optional;
 public interface ConversationRepository extends JpaRepository<Conversation, Long> {
 
     List<Conversation> findByUserOrderByUpdatedAtDesc(AppUser user);
-    
+
     Optional<Conversation> findByIdAndUser(Long id, AppUser user);
+
+    // ID-based methods (preferred - avoids entity detachment issues)
+    List<Conversation> findByUserIdOrderByUpdatedAtDesc(Long userId);
+
+    Optional<Conversation> findByIdAndUserId(Long id, Long userId);
 }

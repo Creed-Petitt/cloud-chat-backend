@@ -54,7 +54,7 @@ public class ConversationService {
         if (conversationId == null || user == null) {
             return Optional.empty();
         }
-        return conversationRepository.findByIdAndUser(conversationId, user);
+        return conversationRepository.findByIdAndUserId(conversationId, user.getId());
     }
 
     @Transactional(readOnly = true)
@@ -62,7 +62,7 @@ public class ConversationService {
         if (user == null) {
             throw new IllegalArgumentException("User cannot be null");
         }
-        return conversationRepository.findByUserOrderByUpdatedAtDesc(user);
+        return conversationRepository.findByUserIdOrderByUpdatedAtDesc(user.getId());
     }
 
     public void updateConversationTimestamp(Conversation conversation) {
@@ -71,7 +71,7 @@ public class ConversationService {
     }
 
     public void deleteConversation(Long conversationId, AppUser user) {
-        conversationRepository.findByIdAndUser(conversationId, user).ifPresent(conversation -> {
+        conversationRepository.findByIdAndUserId(conversationId, user.getId()).ifPresent(conversation -> {
             messageRepository.deleteAllByConversation(conversation);
             conversationRepository.delete(conversation);
         });

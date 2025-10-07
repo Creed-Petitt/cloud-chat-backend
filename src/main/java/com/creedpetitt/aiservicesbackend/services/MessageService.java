@@ -81,7 +81,7 @@ public class MessageService {
         if (user == null) {
             throw new IllegalArgumentException("User cannot be null");
         }
-        return messageRepository.findAllImageMessagesByUser(user);
+        return messageRepository.findAllImageMessagesByUserId(user.getId());
     }
 
     @Transactional

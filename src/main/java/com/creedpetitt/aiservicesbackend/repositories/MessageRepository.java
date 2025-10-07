@@ -14,8 +14,12 @@ import java.util.List;
 public interface MessageRepository extends JpaRepository<Message, Long> {
 
     List<Message> findByConversationOrderByCreatedAtAsc(Conversation conversation);
+
     @Query("SELECT m FROM Message m WHERE m.user = :user AND m.messageType = com.creedpetitt.aiservicesbackend.models.Message.MessageType.ASSISTANT AND m.imageUrl IS NOT NULL ORDER BY m.createdAt DESC")
     List<Message> findAllImageMessagesByUser(@Param("user") com.creedpetitt.aiservicesbackend.models.AppUser user);
+
+    @Query("SELECT m FROM Message m WHERE m.user.id = :userId AND m.messageType = com.creedpetitt.aiservicesbackend.models.Message.MessageType.ASSISTANT AND m.imageUrl IS NOT NULL ORDER BY m.createdAt DESC")
+    List<Message> findAllImageMessagesByUserId(@Param("userId") Long userId);
 
     void deleteAllByConversation(Conversation conversation);
 }

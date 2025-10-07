@@ -1,6 +1,6 @@
 package com.creedpetitt.aiservicesbackend.security;
 
-import com.creedpetitt.aiservicesbackend.services.FirebaseUserDetailsService;
+import com.creedpetitt.aiservicesbackend.models.AppUser;
 import com.creedpetitt.aiservicesbackend.services.UserService;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseToken;
@@ -11,7 +11,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -22,12 +21,10 @@ public class FirebaseFilter extends OncePerRequestFilter {
 
     private final FirebaseAuth firebaseAuth;
     private final UserService userService;
-    private final FirebaseUserDetailsService userDetailsService;
 
-    public FirebaseFilter(FirebaseAuth firebaseAuth, UserService userService, FirebaseUserDetailsService userDetailsService) {
+    public FirebaseFilter(FirebaseAuth firebaseAuth, UserService userService) {
         this.firebaseAuth = firebaseAuth;
         this.userService = userService;
-        this.userDetailsService = userDetailsService;
     }
 
     @Override
@@ -53,11 +50,9 @@ public class FirebaseFilter extends OncePerRequestFilter {
                 ? (String) decodedToken.getClaims().get("sign_in_provider")
                 : "unknown";
 
-            userService.getOrCreateUser(decodedToken.getUid(), decodedToken.getEmail(), provider);
+            AppUser appUser = userService.getOrCreateUser(decodedToken.getUid(), decodedToken.getEmail(), provider);
 
-            UserDetails userDetails = userDetailsService.loadUserByUsername(decodedToken.getUid());
-
-            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(appUser, null, appUser.getAuthorities());
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
         } catch (Exception e) {
