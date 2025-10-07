@@ -9,6 +9,7 @@ import com.creedpetitt.aiservicesbackend.dto.StreamMessageRequestDto;
 import com.creedpetitt.aiservicesbackend.models.AppUser;
 import com.creedpetitt.aiservicesbackend.models.Conversation;
 import com.creedpetitt.aiservicesbackend.models.Message;
+import com.creedpetitt.aiservicesbackend.repositories.UserRepository;
 import com.creedpetitt.aiservicesbackend.services.ConversationService;
 import com.creedpetitt.aiservicesbackend.services.MessageService;
 import com.creedpetitt.aiservicesbackend.services.RateLimitingService;
@@ -39,9 +40,10 @@ public class ChatController extends BaseController {
     public ChatController(ConversationService conversationService,
                          MessageService messageService,
                          UserService userService,
+                         UserRepository userRepository,
                          ChatServiceFactory chatServiceFactory,
                          RateLimitingService rateLimitingService) {
-        super(userService);
+        super(userService, userRepository);
         this.conversationService = conversationService;
         this.messageService = messageService;
         this.chatServiceFactory = chatServiceFactory;

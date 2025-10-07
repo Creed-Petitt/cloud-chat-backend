@@ -7,6 +7,7 @@ import com.creedpetitt.aiservicesbackend.dto.MessageDto;
 import com.creedpetitt.aiservicesbackend.models.AppUser;
 import com.creedpetitt.aiservicesbackend.models.Conversation;
 import com.creedpetitt.aiservicesbackend.models.Message;
+import com.creedpetitt.aiservicesbackend.repositories.UserRepository;
 import com.creedpetitt.aiservicesbackend.services.ConversationService;
 import com.creedpetitt.aiservicesbackend.services.MessageService;
 import com.creedpetitt.aiservicesbackend.services.RateLimitingService;
@@ -33,9 +34,10 @@ public class ImageController extends BaseController {
     public ImageController(ImageServiceFactory imageServiceFactory,
                           RateLimitingService rateLimitingService,
                           UserService userService,
+                          UserRepository userRepository,
                           MessageService messageService,
                           ConversationService conversationService) {
-        super(userService);
+        super(userService, userRepository);
         this.imageServiceFactory = imageServiceFactory;
         this.rateLimitingService = rateLimitingService;
         this.messageService = messageService;
