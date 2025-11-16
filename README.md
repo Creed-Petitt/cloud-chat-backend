@@ -8,8 +8,8 @@ This repository contains the cloud-native Spring Boot backend for CloudChat, a m
 - **Stateful Conversation Persistence**: Saves user conversations and messages in a PostgreSQL database, allowing for stateful interactions.
 - **JWT-Based Security with Firebase**: Integrates with Firebase for robust, token-based user authentication and authorization using Spring Security.
 - **Rate Limiting**: Protects the API from abuse with configurable rate limits:
-  - **Authenticated users**: 20 messages and 3 images per account
-  - **Anonymous users**: 10 messages per IP address (no image generation)
+  - **Authenticated users**: 50 messages and 5 images per account
+  - **Anonymous users**: 25 messages and 3 images per account
 - **Serverless Cloud-Native Architecture**: Designed for serverless deployment on Google Cloud Run, using Cloud SQL for the database and Artifact Registry for container storage.
 - **Automated CI/CD**: A complete GitHub Actions workflow automates testing, building, and deploying the application on every push to the `master` branch.
 
@@ -36,12 +36,9 @@ All endpoints are prefixed with `/api`. Authentication requirements vary by endp
 
 The API implements rate limiting to prevent abuse:
 
-- **Authenticated Users**:
-  - Chat messages: 20 per account
-  - Image generation: 3 per account
-- **Anonymous Users**:
-  - Chat messages: 10 per IP address
-  - Image generation: Not allowed
+- **Authenticated Users** (Firebase/Anonymous users):
+  - Chat messages: 50 per account
+  - Image generation: 5 per account
 
 Rate limit information is included in response headers and response bodies.
 
@@ -232,6 +229,10 @@ This client application demonstrates the backend's full capabilities, including:
 - Graceful handling of API errors and rate-limiting responses.
 
 The frontend repository can be found [here](https://github.com/Creed-Petitt/cloud-chat-frontend).
+
+## Known Limitations
+
+- **Gemini Streaming**: The Gemini chat endpoint currently returns responses in a single payload rather than streaming incrementally. OpenAI and Claude models stream as expected. This is a limitation of the Spring AI Vertex AI Gemini integration. Chat functionality works normally; only real-time streaming is affected.
 
 ## Technology Stack
 
