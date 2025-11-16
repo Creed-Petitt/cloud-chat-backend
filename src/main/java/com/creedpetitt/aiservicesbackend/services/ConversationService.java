@@ -4,8 +4,10 @@ import com.creedpetitt.aiservicesbackend.models.AppUser;
 import com.creedpetitt.aiservicesbackend.models.Conversation;
 import com.creedpetitt.aiservicesbackend.repositories.ConversationRepository;
 import com.creedpetitt.aiservicesbackend.repositories.MessageRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -75,5 +77,13 @@ public class ConversationService {
             messageRepository.deleteAllByConversation(conversation);
             conversationRepository.delete(conversation);
         });
+    }
+
+    public Conversation getOrCreateConversation(Long id, AppUser user, String title, String aiModel) {
+        if (id == null || id == 0) {
+            return createConversation(user, title, aiModel);
+        }
+        return getConversation(id, user)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversation not found"));
     }
 }

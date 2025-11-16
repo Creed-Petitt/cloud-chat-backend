@@ -106,20 +106,15 @@ public class ChatController extends BaseController {
 
         String imageUrl = request.imageUrl();
         String aiModel = request.aiModel();
-        Conversation conversation = null;
-
-        if (id != 0) {
-            Optional<Conversation> conversationOpt = conversationService.getConversation(id, user);
-            if (conversationOpt.isEmpty()) {
-                emitter.completeWithError(new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversation not found."));
-                return emitter;
-            }
-            conversation = conversationOpt.get();
-        }
 
         if (aiModel == null || aiModel.trim().isEmpty()) {
-            if (conversation != null) {
-                aiModel = conversation.getAiModel();
+            if (id != 0) {
+                Optional<Conversation> existingConv = conversationService.getConversation(id, user);
+                if (existingConv.isEmpty()) {
+                    emitter.completeWithError(new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversation not found."));
+                    return emitter;
+                }
+                aiModel = existingConv.get().getAiModel();
             } else {
                 emitter.completeWithError(new ResponseStatusException(HttpStatus.BAD_REQUEST, "aiModel must be provided for new conversations."));
                 return emitter;
@@ -132,15 +127,8 @@ public class ChatController extends BaseController {
             return emitter;
         }
 
-        // Create conversation and save user message
-        final Conversation finalConversation;
-
-        if (id == 0) {
-            String title = generateTitle(content);
-            finalConversation = conversationService.createConversation(user, title, aiModel);
-        } else {
-            finalConversation = conversation;
-        }
+        String title = generateTitle(content);
+        final Conversation finalConversation = conversationService.getOrCreateConversation(id, user, title, aiModel);
 
         if (imageUrl != null && !imageUrl.trim().isEmpty()) {
             messageService.addUserMessage(finalConversation, user, content, imageUrl);

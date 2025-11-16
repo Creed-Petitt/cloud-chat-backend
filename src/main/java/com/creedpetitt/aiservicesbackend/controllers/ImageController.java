@@ -72,14 +72,10 @@ public class ImageController extends BaseController {
         try {
             String imageUrl = imageService.generateImage(prompt);
 
-            Conversation conversation;
-            if (conversationIdStr != null && !conversationIdStr.isEmpty()) {
-                long conversationId = Long.parseLong(conversationIdStr);
-                conversation = conversationService.getConversationById(conversationId)
-                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversation not found"));
-            } else {
-                conversation = conversationService.createConversation(user, "Image Generation", model);
-            }
+            Long conversationId = (conversationIdStr != null && !conversationIdStr.isEmpty())
+                ? Long.parseLong(conversationIdStr) : 0L;
+            Conversation conversation = conversationService.getOrCreateConversation(
+                conversationId, user, "Image Generation", model);
 
             messageService.recordImageGeneration(conversation, user, prompt, imageUrl, model);
 
