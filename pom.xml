@@ -76,6 +76,11 @@
             <artifactId>spring-ai-starter-model-vertex-ai-gemini</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.google.cloud</groupId>
+            <artifactId>google-cloud-vertexai</artifactId>
+            <version>1.7.0</version>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-model-anthropic</artifactId>
         </dependency>
@@ -135,7 +140,7 @@
         <dependency>
             <groupId>com.google.cloud</groupId>
             <artifactId>google-cloud-aiplatform</artifactId>
-            <version>3.56.0</version>
+            <version>3.62.0</version>
         </dependency>
     </dependencies>
 
